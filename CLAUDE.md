@@ -21,13 +21,14 @@ Both servers must be running for the Notes page to work; the Product Viewer page
 
 ## First-time Setup
 
-**Important:** The Prisma migrations have not been run yet (PostgreSQL was not reachable during scaffolding). Before the Notes page will function:
+The Notes page needs a running PostgreSQL instance with the schema migrated in. Verified working with:
 
-1. Ensure you have a running PostgreSQL instance.
-2. Update `server/.env` with a valid `DATABASE_URL` pointing to your PostgreSQL database (see `server/.env.example` for the format).
-3. From the `server/` directory, run `npx prisma migrate dev --name init` to create the database schema.
+```bash
+docker run --name fsan-postgres -e POSTGRES_PASSWORD=password -e POSTGRES_DB=full_stack_app_node -p 5432:5432 -d postgres:16
+cd server && npx prisma migrate dev --name init
+```
 
-The Notes page will not work until these setup steps are completed.
+`server/.env.example` already matches this container's defaults (`postgresql://postgres:password@localhost:5432/full_stack_app_node?schema=public` — note the official `postgres` image's default user is `postgres`, not `user`). If the container already exists and was just stopped, restart it with `docker start fsan-postgres` and run `npx prisma migrate deploy` instead (the migration already exists, just needs applying).
 
 ## Architecture
 
