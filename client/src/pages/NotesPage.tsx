@@ -11,10 +11,16 @@ export default function NotesPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function loadNotes() {
-    const { data } = await api.get<Note[]>("/api/notes");
-    setNotes(data);
+    try {
+      setError(null);
+      const { data } = await api.get<Note[]>("/api/notes");
+      setNotes(data);
+    } catch {
+      setError("Could not reach the API — is the server running?");
+    }
   }
 
   useEffect(() => {
@@ -23,15 +29,20 @@ export default function NotesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (editingId === null) {
-      await api.post("/api/notes", { title, content });
-    } else {
-      await api.put(`/api/notes/${editingId}`, { title, content });
-      setEditingId(null);
+    try {
+      setError(null);
+      if (editingId === null) {
+        await api.post("/api/notes", { title, content });
+      } else {
+        await api.put(`/api/notes/${editingId}`, { title, content });
+        setEditingId(null);
+      }
+      await loadNotes();
+      setTitle("");
+      setContent("");
+    } catch {
+      setError("Could not reach the API — is the server running?");
     }
-    setTitle("");
-    setContent("");
-    await loadNotes();
   }
 
   function startEdit(note: Note) {
@@ -41,13 +52,19 @@ export default function NotesPage() {
   }
 
   async function handleDelete(id: number) {
-    await api.delete(`/api/notes/${id}`);
-    await loadNotes();
+    try {
+      setError(null);
+      await api.delete(`/api/notes/${id}`);
+      await loadNotes();
+    } catch {
+      setError("Could not reach the API — is the server running?");
+    }
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <h1 className="text-2xl font-bold">Notes</h1>
+      {error && <p className="text-red-600">{error}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <Input

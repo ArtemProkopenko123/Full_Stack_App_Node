@@ -21,6 +21,8 @@ Both servers must be running for the Notes page to work; the Product Viewer page
 
 ## First-time Setup
 
+0. Run `npm install` in both `server/` and `client/` before anything else.
+
 The Notes page needs a running PostgreSQL instance with the schema migrated in. Verified working with:
 
 ```bash
@@ -29,6 +31,8 @@ cd server && npx prisma migrate dev --name init
 ```
 
 `server/.env.example` already matches this container's defaults (`postgresql://postgres:password@localhost:5432/full_stack_app_node?schema=public` — note the official `postgres` image's default user is `postgres`, not `user`). If the container already exists and was just stopped, restart it with `docker start fsan-postgres` and run `npx prisma migrate deploy` instead (the migration already exists, just needs applying).
+
+`GET /health` works without a database — it's the fastest way to confirm the server process itself is up, independent of the Postgres/migration situation.
 
 ## Architecture
 
