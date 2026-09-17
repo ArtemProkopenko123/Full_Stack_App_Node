@@ -1,5 +1,6 @@
 import express, { Application } from "express";
 import cors from "cors";
+import { notesRouter } from "./routes/notes";
 
 export function createApp(): Application {
   const app = express();
@@ -10,6 +11,8 @@ export function createApp(): Application {
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
   });
+
+  app.use("/api/notes", notesRouter);
 
   return app;
 }
