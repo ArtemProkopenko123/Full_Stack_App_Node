@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "../lib/api";
+import { useShallow } from "zustand/react/shallow";
+import { useNotesStore } from "../stores/useNotesStore";
 import type { Note } from "../types/note";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,41 +8,35 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function NotesPage() {
-  const [notes, setNotes] = useState<Note[]>([]);
+  const { notes, error } = useNotesStore(
+    useShallow((s) => ({ notes: s.notes, error: s.error })),
+  );
+  const loadNotes = useNotesStore((s) => s.loadNotes);
+  const createNote = useNotesStore((s) => s.createNote);
+  const updateNote = useNotesStore((s) => s.updateNote);
+  const deleteNote = useNotesStore((s) => s.deleteNote);
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function loadNotes() {
-    try {
-      setError(null);
-      const { data } = await api.get<Note[]>("/api/notes");
-      setNotes(data);
-    } catch {
-      setError("Could not reach the API — is the server running?");
-    }
-  }
 
   useEffect(() => {
     loadNotes();
-  }, []);
+  }, [loadNotes]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      setError(null);
       if (editingId === null) {
-        await api.post("/api/notes", { title, content });
+        await createNote(title, content);
       } else {
-        await api.put(`/api/notes/${editingId}`, { title, content });
+        await updateNote(editingId, title, content);
         setEditingId(null);
       }
-      await loadNotes();
       setTitle("");
       setContent("");
     } catch {
-      setError("Could not reach the API — is the server running?");
+      // error is already surfaced via the store's `error` state
     }
   }
 
@@ -53,11 +48,9 @@ export default function NotesPage() {
 
   async function handleDelete(id: number) {
     try {
-      setError(null);
-      await api.delete(`/api/notes/${id}`);
-      await loadNotes();
+      await deleteNote(id);
     } catch {
-      setError("Could not reach the API — is the server running?");
+      // error is already surfaced via the store's `error` state
     }
   }
 
