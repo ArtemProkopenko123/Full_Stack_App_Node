@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useNotesStore } from "../stores/useNotesStore";
 import type { Note } from "../types/note";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@app/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@artemprokopenko/ui";
 
 import { useUsersStore } from "@/stores/useUsersStore";
 
