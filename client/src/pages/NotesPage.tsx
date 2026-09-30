@@ -6,15 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useUsersStore } from "@/stores/useUsersStore";
 
 export default function NotesPage() {
   const { notes, error } = useNotesStore(
     useShallow((s) => ({ notes: s.notes, error: s.error })),
   );
+  const { users, user_error } = useUsersStore( useShallow((s) => ({ users: s.users, user_error: s.error })), )
   const loadNotes = useNotesStore((s) => s.loadNotes);
   const createNote = useNotesStore((s) => s.createNote);
   const updateNote = useNotesStore((s) => s.updateNote);
   const deleteNote = useNotesStore((s) => s.deleteNote);
+  const loadUsers = useUsersStore((s) => s.loadUsers);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -22,6 +32,7 @@ export default function NotesPage() {
 
   useEffect(() => {
     loadNotes();
+    loadUsers();
   }, [loadNotes]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -58,6 +69,7 @@ export default function NotesPage() {
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <h1 className="text-2xl font-bold">Notes</h1>
       {error && <p className="text-red-600">{error}</p>}
+      {user_error && <p className="text-red-600">{user_error}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <Input
@@ -72,6 +84,18 @@ export default function NotesPage() {
           onChange={(e) => setContent(e.target.value)}
           required
         />
+        <Select>
+          <SelectTrigger>
+            <SelectValue placeholder="Select a user" />
+          </SelectTrigger>
+          <SelectContent>
+            {users.map((user) => (
+              <SelectItem key={user.id} value={user.id.toString()}>
+                {user.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button type="submit">{editingId === null ? "Add note" : "Save changes"}</Button>
       </form>
 
