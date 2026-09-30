@@ -2,17 +2,8 @@ import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useNotesStore } from "../stores/useNotesStore";
 import type { Note } from "../types/note";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@app/ui";
+
 import { useUsersStore } from "@/stores/useUsersStore";
 
 export default function NotesPage() {
