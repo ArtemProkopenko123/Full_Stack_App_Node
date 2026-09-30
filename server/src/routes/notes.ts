@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { noteInputSchema } from "@app/shared";
 import { prisma } from "../prisma";
 
 export const notesRouter = Router();
@@ -15,8 +16,9 @@ notesRouter.get("/:id", async (req, res) => {
 });
 
 notesRouter.post("/", async (req, res) => {
-  const { title, content } = req.body;
-  const note = await prisma.note.create({ data: { title, content } });
+  const parsed = noteInputSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const note = await prisma.note.create({ data: parsed.data });
   res.status(201).json(note);
 });
 
@@ -25,10 +27,11 @@ notesRouter.put("/:id", async (req, res) => {
   const existing = await prisma.note.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: "Note not found" });
 
-  const { title, content } = req.body;
+  const parsed = noteInputSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const note = await prisma.note.update({
     where: { id },
-    data: { title, content },
+    data: parsed.data,
   });
   res.json(note);
 });

@@ -4,8 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+**Monorepo root** (npm workspaces + Turborepo; single `package-lock.json` at the root):
+- `npm install` — install all workspaces (run once at the root, not per package)
+- `npm run dev` — `turbo run dev`: builds `@app/shared`, then runs shared watch + API + client in parallel
+- `npm run build` / `typecheck` / `lint` — `turbo run ...`; results are cached in `.turbo/` (re-run = `FULL TURBO`)
+- `npx turbo run build --filter=server` — run a task for one package (plus its dependencies)
+
 **Server** (`server/`):
-- `npm install` — install dependencies
 - `npm run dev` — run the API on http://localhost:4000 with hot reload
 - `npm run build` — compile TypeScript to `dist/`
 - `npx prisma migrate dev --name <name>` — create/apply a migration after editing `prisma/schema.prisma`
@@ -36,7 +41,10 @@ cd server && npx prisma migrate dev --name init
 
 ## Architecture
 
-Two independent projects, no workspaces:
+Monorepo with npm workspaces (`client`, `server`, `packages/*`) orchestrated by Turborepo (`turbo.json`):
+
+- `packages/shared` (`@app/shared`) — Zod schemas + inferred types (`Note`, `User`, `noteInputSchema`), built with `tsup` to CJS+ESM in `dist/`. The server validates request bodies with it; the client re-exports its types. Consumers need it built first — Turbo's `dependsOn: ["^build"]` handles that.
+
 
 - `server/` — Express + TypeScript REST API. `src/app.ts` builds the Express app and mounts routers; `src/index.ts` starts it. `src/prisma.ts` exports the shared `PrismaClient` singleton. Routes live under `src/routes/`, one file per resource (currently `notes.ts`, mounted at `/api/notes`). Data model is defined in `prisma/schema.prisma`.
 
