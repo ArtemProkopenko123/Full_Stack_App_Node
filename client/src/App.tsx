@@ -5,6 +5,7 @@ import ProductViewerPage from "./pages/ProductViewerPage";
 import BigDataPage from "./pages/BigDataPage";
 import GraphPage from "./pages/GraphPage";
 import TablePage from "./pages/TablePage";
+import MapPage from "./pages/MapPage";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/big-data" element={<BigDataPage />} />
         <Route path="/graph" element={<GraphPage />} />
         <Route path="/table" element={<TablePage />} />
+        <Route path="/map" element={<MapPage />} />
       </Routes>
     </>
   );

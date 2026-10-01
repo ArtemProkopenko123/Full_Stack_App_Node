@@ -21,6 +21,9 @@ export default function NavBar() {
       <NavLink to="/table" className={linkClass}>
         Table
       </NavLink>
+      <NavLink to="/map" className={linkClass}>
+        Map
+      </NavLink>
     </nav>
   );
 }

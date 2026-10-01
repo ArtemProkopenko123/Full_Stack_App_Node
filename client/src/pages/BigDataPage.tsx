@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { useFps } from "@/lib/useFps";
 
 // Страница-бенчмарк: рисуем N анимированных точек тремя способами и сравниваем FPS.
 // Главная идея: чем больше работы уходит с CPU/DOM на GPU, тем больше точек выдерживает страница.
@@ -201,29 +202,6 @@ function Tick({ material }: { material: THREE.ShaderMaterial }) {
 }
 
 // ---------- Счётчик FPS ----------
-function useFps() {
-  const [fps, setFps] = useState(0);
-  useEffect(() => {
-    let frames = 0;
-    let last = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      frames++; // считаем кадры
-      // Раз в 500 мс переводим кадры в FPS. Обновляем state редко, чтобы сам счётчик не тормозил страницу.
-      if (now - last >= 500) {
-        setFps(Math.round((frames * 1000) / (now - last)));
-        frames = 0;
-        last = now;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return fps;
-}
-
-// ---------- Страница ----------
 export default function BigDataPage() {
   const [mode, setMode] = useState<Mode>("canvas2d");
   // Сколько точек просил пользователь (ползунком).

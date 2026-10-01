@@ -56,3 +56,34 @@ export const rowsStreamQuerySchema = z.object({
 
 export type Row = z.infer<typeof rowSchema>
 export type RowStatus = z.infer<typeof rowStatusSchema>
+
+// ---------------------------------------------------------------------------
+// "Points" — a synthetic set of geo points for the Map demo page.
+// ---------------------------------------------------------------------------
+
+/** Number of points the server fabricates in memory. */
+export const POINTS_TOTAL = 500_000
+
+/** Category of a point (index into this array is what the binary endpoint ships). */
+export const POINT_CATEGORIES = ["cafe", "shop", "school", "park", "office"] as const
+
+/** The part of the map the user currently sees + its zoom level. */
+export const pointsBboxQuerySchema = z.object({
+  west: z.coerce.number().min(-180).max(180),
+  south: z.coerce.number().min(-90).max(90),
+  east: z.coerce.number().min(-180).max(180),
+  north: z.coerce.number().min(-90).max(90),
+  zoom: z.coerce.number().int().min(0).max(22),
+})
+
+/** "Own data" of a single point, fetched on demand when the user clicks it. */
+export const pointDetailsSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  category: z.enum(POINT_CATEGORIES),
+  value: z.number(),
+  lng: z.number(),
+  lat: z.number(),
+})
+
+export type PointDetails = z.infer<typeof pointDetailsSchema>
