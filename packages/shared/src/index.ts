@@ -61,14 +61,22 @@ export type RowStatus = z.infer<typeof rowStatusSchema>
 // "Points" — a synthetic set of geo points for the Map demo page.
 // ---------------------------------------------------------------------------
 
-/** Number of points the server fabricates in memory. */
+/** Datasets the Map page can show. */
+export const POINT_DATASETS = ["synthetic", "sgp"] as const
+export type PointDatasetId = (typeof POINT_DATASETS)[number]
+const datasetField = z.enum(POINT_DATASETS).default("synthetic")
+
+/** Number of points in the synthetic dataset (fabricated in memory by the server). */
 export const POINTS_TOTAL = 500_000
 
-/** Category of a point (index into this array is what the binary endpoint ships). */
+/** Category names of the synthetic dataset (the binary endpoint ships the index into this array). */
 export const POINT_CATEGORIES = ["cafe", "shop", "school", "park", "office"] as const
 
+/** Which dataset a request is about. */
+export const pointsDatasetQuerySchema = z.object({ dataset: datasetField })
+
 /** The part of the map the user currently sees + its zoom level. */
-export const pointsBboxQuerySchema = z.object({
+export const pointsBboxQuerySchema = pointsDatasetQuerySchema.extend({
   west: z.coerce.number().min(-180).max(180),
   south: z.coerce.number().min(-90).max(90),
   east: z.coerce.number().min(-180).max(180),
@@ -76,14 +84,24 @@ export const pointsBboxQuerySchema = z.object({
   zoom: z.coerce.number().int().min(0).max(22),
 })
 
-/** "Own data" of a single point, fetched on demand when the user clicks it. */
+/** Describes a loaded dataset (answering this request is what triggers loading it). */
+export const pointsMetaSchema = z.object({
+  dataset: z.enum(POINT_DATASETS),
+  label: z.string(),
+  source: z.string(),
+  total: z.number(),
+  categories: z.array(z.string()), // names, in the order of the category index
+})
+
+/** "Own data" of a single point, fetched on demand when the user clicks it. Fields differ per dataset. */
 export const pointDetailsSchema = z.object({
   id: z.number(),
   name: z.string(),
-  category: z.enum(POINT_CATEGORIES),
-  value: z.number(),
+  category: z.string(),
   lng: z.number(),
   lat: z.number(),
+  fields: z.record(z.string(), z.union([z.string(), z.number(), z.null()])),
 })
 
+export type PointMeta = z.infer<typeof pointsMetaSchema>
 export type PointDetails = z.infer<typeof pointDetailsSchema>

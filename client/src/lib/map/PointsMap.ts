@@ -16,8 +16,7 @@
 
 import axios from "axios";
 import { ScatterplotLayer, TextLayer } from "@deck.gl/layers";
-import { POINT_CATEGORIES } from "@app/shared";
-import type { PointDetails } from "@app/shared";
+import type { PointDatasetId, PointDetails, PointMeta } from "@app/shared";
 import { api } from "../api";
 import { createGoogleMap, createMapLibre } from "./basemap";
 import type { BaseMap, Provider } from "./basemap";
@@ -32,11 +31,20 @@ export interface MapStats {
   lastFetchMs: number;
   lastBytes: number;
   loading: boolean;
+  /** true while the SERVER is preparing a dataset (the first "sgp" load downloads ~35 MB) */
+  loadingDataset: boolean;
+  /** number of points in the dataset (known once its meta has arrived) */
+  total: number;
 }
 
 interface Options {
   provider: Provider;
   googleKey?: string;
+  // initial state (later changes go through setMode / setMarkerLimit / setDataset)
+  dataset: PointDatasetId;
+  mode: Mode;
+  markerLimit: number;
+  onMeta: (m: PointMeta) => void;
   onStats: (s: MapStats) => void;
   onSelect: (p: PointDetails | null) => void;
   onError: (message: string) => void;
@@ -53,6 +61,12 @@ const PALETTE: [number, number, number][] = [
 const css = (c: [number, number, number]) => `rgb(${c[0]},${c[1]},${c[2]})`;
 const CLUSTER_COLOR = [15, 23, 42, 210];
 
+// Where the camera starts for each dataset (zoom in the 512px-tile convention, see View.zoom).
+const START_VIEW: Record<PointDatasetId, { lng: number; lat: number; zoom: number }> = {
+  synthetic: { lng: 15, lat: 49, zoom: 3.5 }, // Europe
+  sgp: { lng: 0, lat: 25, zoom: 1.3 }, // the whole world
+};
+
 /** 1234 -> "1.2k" (cluster labels must stay short to fit inside the circle) */
 const abbreviate = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n));
 
@@ -66,8 +80,11 @@ interface Dataset {
 export class PointsMap {
   private base!: BaseMap;
   private opts: Options;
-  private mode: Mode = "clusters";
-  private markerLimit = 500;
+  private mode: Mode;
+  private markerLimit: number;
+  private datasetId: PointDatasetId;
+  private meta: PointMeta | null = null; // set once the server has loaded the dataset
+  private metaLoading: Promise<PointMeta> | null = null;
   private dataset: Dataset | null = null;
   private datasetLoading: Promise<Dataset> | null = null;
   private lastItems: number[] = []; // flat cluster response, kept so a click can map index -> item
@@ -78,7 +95,13 @@ export class PointsMap {
 
   private constructor(opts: Options) {
     this.opts = opts;
-    this.stats = { provider: opts.provider, mode: this.mode, drawn: 0, lastFetchMs: 0, lastBytes: 0, loading: false };
+    this.mode = opts.mode;
+    this.markerLimit = opts.markerLimit;
+    this.datasetId = opts.dataset;
+    this.stats = {
+      provider: opts.provider, mode: opts.mode, drawn: 0, lastFetchMs: 0, lastBytes: 0,
+      loading: false, loadingDataset: false, total: 0,
+    };
   }
 
   static async create(container: HTMLElement, opts: Options): Promise<PointsMap> {
@@ -87,6 +110,8 @@ export class PointsMap {
       opts.provider === "google"
         ? await createGoogleMap(container, opts.googleKey ?? "")
         : await createMapLibre(container);
+    const v = START_VIEW[opts.dataset];
+    pm.base.jumpTo(v.lng, v.lat, v.zoom); // before onIdle is registered, so it doesn't trigger a refresh
     // Re-evaluate what to show whenever the camera settles. Not on every frame: for
     // "clusters" that would be a network request per frame.
     pm.base.onIdle(() => void pm.refresh());
@@ -102,6 +127,25 @@ export class PointsMap {
     this.base.setMarkers([]);
     this.abort?.abort();
     this.emit({ lastFetchMs: 0, lastBytes: 0 }); // don't show the previous mode's network numbers
+    void this.refresh();
+  }
+
+  /** Switch to another dataset: drop everything that belongs to the old one and start over. */
+  setDataset(id: PointDatasetId) {
+    if (id === this.datasetId) return;
+    this.datasetId = id;
+    this.meta = null;
+    this.metaLoading = null;
+    this.dataset = null;
+    this.datasetLoading = null;
+    this.lastItems = [];
+    this.abort?.abort();
+    this.base.setLayers([]);
+    this.base.setMarkers([]);
+    this.opts.onSelect(null);
+    this.emit({ drawn: 0, total: 0, lastFetchMs: 0, lastBytes: 0 });
+    const v = START_VIEW[id];
+    this.base.jumpTo(v.lng, v.lat, v.zoom); // each dataset lives somewhere else on the globe
     void this.refresh();
   }
 
@@ -123,6 +167,8 @@ export class PointsMap {
     if (this.disposed) return;
     const seq = ++this.seq;
     try {
+      await this.ensureMeta();
+      if (seq !== this.seq || this.disposed) return;
       if (this.mode === "clusters") await this.showClusters(seq);
       else if (this.mode === "gpu") await this.showAllOnGpu(seq);
       else await this.showMarkers(seq);
@@ -130,6 +176,35 @@ export class PointsMap {
       if (axios.isCancel(e)) return; // superseded by a newer refresh — expected
       this.opts.onError(e instanceof Error ? e.message : "Request failed");
     }
+  }
+
+  /**
+   * Make sure the server has the dataset loaded. For "sgp" the first call can take a minute
+   * (the server downloads ~35 MB from sgp-search.io once, then keeps a copy), so the UI is
+   * told via `loadingDataset`. Later calls resolve immediately from the cached promise.
+   */
+  private ensureMeta(): Promise<PointMeta> {
+    if (this.meta) return Promise.resolve(this.meta);
+    if (!this.metaLoading) {
+      const id = this.datasetId;
+      this.emit({ loadingDataset: true, loading: true });
+      this.metaLoading = api
+        .get<PointMeta>("/api/points/meta", { params: { dataset: id } })
+        .then(({ data }) => {
+          if (id === this.datasetId) { // ignore a response for a dataset we already switched away from
+            this.meta = data;
+            this.opts.onMeta(data);
+            this.emit({ loadingDataset: false, total: data.total });
+          }
+          return data;
+        })
+        .catch((e) => {
+          this.metaLoading = null; // allow a retry on the next refresh
+          this.emit({ loadingDataset: false, loading: false });
+          throw e;
+        });
+    }
+    return this.metaLoading;
   }
 
   private emit(patch: Partial<MapStats>) {
@@ -146,7 +221,16 @@ export class PointsMap {
     const t0 = performance.now();
     const v = this.base.getView();
     const res = await api.get<string>("/api/points/clusters", {
-      params: { west: v.west, south: v.south, east: v.east, north: v.north, zoom: Math.floor(v.zoom) },
+      params: {
+        dataset: this.datasetId,
+        // Zoomed far out the visible area is wider than the globe (e.g. west = -217°); the API
+        // only accepts real coordinates, and nothing exists outside them anyway, so clamp.
+        west: Math.max(v.west, -180),
+        south: Math.max(v.south, -90),
+        east: Math.min(v.east, 180),
+        north: Math.min(v.north, 90),
+        zoom: Math.max(Math.floor(v.zoom), 0),
+      },
       signal: ctrl.signal,
       // keep the raw text so we can report the payload size, then parse it ourselves
       responseType: "text",
@@ -227,7 +311,7 @@ export class PointsMap {
       autoHighlight: true,
       onClick: (info) => { if (info.index >= 0) void this.select(info.index + 1); }, // index i <=> id i+1
     });
-    this.base.setLayers([layer], ({ index }) => (index >= 0 ? `Point #${index + 1} — ${POINT_CATEGORIES[this.categoryOf(index)]}` : null));
+    this.base.setLayers([layer], ({ index }) => (index >= 0 ? `#${index + 1} — ${this.meta?.categories[this.categoryOf(index)] ?? ""}` : null));
     this.emit({ drawn: data.count, loading: false, ...(hadData ? {} : { lastFetchMs: performance.now() - t0, lastBytes: data.count * 9 }) });
   }
 
@@ -240,8 +324,9 @@ export class PointsMap {
   /** Downloads all points once and caches them (concurrent callers share one request). */
   private loadDataset(): Promise<Dataset> {
     if (this.dataset) return Promise.resolve(this.dataset);
+    const id = this.datasetId; // the user may switch datasets while this download is running
     this.datasetLoading ??= api
-      .get<ArrayBuffer>("/api/points/binary", { responseType: "arraybuffer" })
+      .get<ArrayBuffer>("/api/points/binary", { params: { dataset: this.datasetId }, responseType: "arraybuffer" })
       .then(({ data: buf }) => {
         // Wire format: Float32 [lng,lat]*N, then Uint8 category*N  ->  9 bytes per point
         const count = buf.byteLength / 9;
@@ -255,7 +340,13 @@ export class PointsMap {
           colors[i * 4 + 2] = c[2];
           colors[i * 4 + 3] = 200;
         }
-        return (this.dataset = { count, positions, colors });
+        const ds = { count, positions, colors };
+        if (id === this.datasetId) this.dataset = ds; // don't let a stale download overwrite the new dataset
+        return ds;
+      })
+      .catch((e) => {
+        if (id === this.datasetId) this.datasetLoading = null; // allow a retry
+        throw e;
       });
     return this.datasetLoading;
   }
@@ -284,7 +375,7 @@ export class PointsMap {
   // ---- selection: the point's "own data" ---------------------------------------------
   private async select(id: number) {
     try {
-      const { data } = await api.get<PointDetails>(`/api/points/${id}`);
+      const { data } = await api.get<PointDetails>(`/api/points/${id}`, { params: { dataset: this.datasetId } });
       if (!this.disposed) this.opts.onSelect(data);
     } catch (e) {
       this.opts.onError(e instanceof Error ? e.message : "Failed to load the point");

@@ -42,6 +42,8 @@ export interface BaseMap {
   /** Replace the deck.gl layers drawn over the map. */
   setLayers(layers: Layer[], getTooltip?: (info: { index: number; layer: Layer | null }) => string | null): void;
   zoomToward(lng: number, lat: number, zoomDelta: number): void;
+  /** Instantly move the camera. `zoom` uses the same 512px-tile convention as View.zoom. */
+  jumpTo(lng: number, lat: number, zoom: number): void;
   /** Replace ALL DOM markers (the deliberately slow approach, kept for comparison). */
   setMarkers(markers: MarkerSpec[]): void;
   dispose(): void;
@@ -90,6 +92,9 @@ export async function createMapLibre(container: HTMLElement): Promise<BaseMap> {
     },
     zoomToward(lng, lat, dz) {
       map.easeTo({ center: [lng, lat], zoom: map.getZoom() + dz });
+    },
+    jumpTo(lng, lat, zoom) {
+      map.jumpTo({ center: [lng, lat], zoom });
     },
     setMarkers(specs) {
       markers.forEach((m) => m.remove());
@@ -140,6 +145,9 @@ export async function createGoogleMap(container: HTMLElement, apiKey: string): P
     zoomToward(lng, lat, dz) {
       map.panTo({ lat, lng });
       map.setZoom((map.getZoom() ?? 4) + dz);
+    },
+    jumpTo(lng, lat, zoom) {
+      map.moveCamera({ center: { lat, lng }, zoom: zoom + 1 }); // 512px-tile zoom -> Google's 256px-tile zoom
     },
     setMarkers(specs) {
       markers.forEach((m) => { m.map = null; });
