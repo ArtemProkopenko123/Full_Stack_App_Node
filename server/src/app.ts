@@ -2,6 +2,7 @@ import express, { Application } from "express";
 import cors from "cors";
 import { notesRouter } from "./routes/notes";
 import { usersRouter } from "./routes/users";
+import { rowsRouter } from "./routes/rows";
 
 export function createApp(): Application {
   const app = express();
@@ -15,6 +16,7 @@ export function createApp(): Application {
 
   app.use("/api/notes", notesRouter);
   app.use("/api/users", usersRouter);
+  app.use("/api/rows", rowsRouter);
 
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error(err);

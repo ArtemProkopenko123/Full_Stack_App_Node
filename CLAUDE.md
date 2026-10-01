@@ -53,6 +53,7 @@ Monorepo with npm workspaces (`client`, `server`, `packages/*`) orchestrated by 
 - Notes flow: `NotesPage` → axios → `server/src/routes/notes.ts` → Prisma → PostgreSQL. Standard JSON REST, no auth.
 
 - Product Viewer (`/product-viewer`): a standalone `@react-three/fiber` scene loading a bundled GLTF model (`client/public/models/Duck.glb`) — no backend calls. Exists purely to practice Three.js/react-three-fiber patterns (job-relevant 3D skills), not tied to app data.
+- Big-data demos (performance practice, no app data): `/big-data` (DOM vs Canvas 2D vs WebGL points), `/graph` (WebGL graph with a d3-force layout in a Web Worker, quadtree hit-testing, level of detail; code in `client/src/lib/graph/`), `/table` (hand-rolled virtual scroller over a synthetic 1M-row dataset served by `server/src/routes/rows.ts` via Postgres `generate_series` — no table or migration — plus an NDJSON streaming endpoint).
 
 ## Environment
 

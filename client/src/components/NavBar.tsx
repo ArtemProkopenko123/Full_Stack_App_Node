@@ -12,6 +12,15 @@ export default function NavBar() {
       <NavLink to="/product-viewer" className={linkClass}>
         Product Viewer
       </NavLink>
+      <NavLink to="/big-data" className={linkClass}>
+        Big Data
+      </NavLink>
+      <NavLink to="/graph" className={linkClass}>
+        Graph
+      </NavLink>
+      <NavLink to="/table" className={linkClass}>
+        Table
+      </NavLink>
     </nav>
   );
 }
